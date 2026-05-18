@@ -24,6 +24,7 @@ import requests
 from pdf2image import convert_from_path
 from pydantic import BaseModel, ConfigDict, Field
 from PyPDF2 import PdfReader, PdfWriter
+from db_check import check_invoices, _clean_invoice_number
 
 # Load OPENAI_API_KEY (and other vars) from .env next to this file so CLI runs work from any cwd.
 load_dotenv(Path(__file__).resolve().parent / ".env", override=True)
@@ -624,6 +625,7 @@ class RunResult:
     total_pages: int
     invoice_files: List[Path] = field(default_factory=list)
     discard_files: List[Path] = field(default_factory=list)
+    duplicate_files: List[Path] = field(default_factory=list)
     review_file: Optional[Path] = None
     manifest_path: Optional[Path] = None
     report_path: Optional[Path] = None
@@ -723,6 +725,8 @@ def format_run_report(result: RunResult) -> str:
         lines.append("(Send these to your accounting / AP workflow.)")
         lines.append("")
         for i, inv in enumerate(result.invoices):
+            if inv.get("moved_to_duplicates"):
+                continue
             fname = (
                 result.invoice_files[i].name
                 if i < len(result.invoice_files)
@@ -737,6 +741,26 @@ def format_run_report(result: RunResult) -> str:
                 f"({_format_page_label(inv)} in original)"
             )
         lines.append("")
+        
+        if result.duplicate_files:
+            lines.append(f"⚠ POTENTIAL DUPLICATES ({len(result.duplicate_files)} files):")
+            lines.append("(These invoices may already be in your system. Review before sending to AP.)")
+            lines.append("")
+            for inv in result.invoices:
+                if not inv.get("moved_to_duplicates"):
+                    continue
+                lines.append(
+                    f"  • {inv.get('invoice_number', '?')}"
+                )
+                lines.append(
+                    f"      {inv.get('vendor', 'Unknown')}"
+                )
+                if inv.get("db_vendor"):
+                    lines.append(
+                        f"      DB Match: {inv.get('db_vendor')} (score: {inv.get('vendor_score')}%)"
+                    )
+            lines.append("")
+        
         if result.discard_files or result.discards:
             lines.append("DISCARDED — NOT FOR AP (discard/ folder):")
             lines.append("(Summary pages, blanks, boilerplate — do not forward.)")
@@ -752,7 +776,11 @@ def format_run_report(result: RunResult) -> str:
             lines.append("")
         lines.append("NEXT STEP:")
         lines.append(f"  Open: {result.output_dir}")
-        lines.append("  Use only the output_*.pdf files (not the discard/ folder).")
+        if result.duplicate_files:
+            lines.append("  1. Review duplicates/ folder for potential re-processed invoices")
+            lines.append("  2. Use only output_*.pdf files (not duplicates/ or discard/ folders)")
+        else:
+            lines.append("  Use only the output_*.pdf files (not the discard/ folder).")
     elif result.status == RunStatus.NEEDS_REVIEW:
         lines.append("WHAT HAPPENED:")
         lines.append("  The program could not split this PDF with enough confidence.")
@@ -795,9 +823,13 @@ def print_run_summary(result: RunResult) -> None:
     print(border)
     if result.status == RunStatus.SUCCESS:
         print(f"\n  {len(result.invoice_files)} invoice PDF(s) → {result.output_dir}")
+        if result.duplicate_files:
+            print(f"  ⚠ {len(result.duplicate_files)} potential duplicate(s) → {result.output_dir}/duplicates/")
         if result.discard_files:
             print(f"  {len(result.discard_files)} discarded page file(s) → {result.discard_dir}")
         print("\n  Open the output folder and use the files that start with output_")
+        if result.duplicate_files:
+            print("  (Review the duplicates/ folder first before sending to AP)")
     elif result.status == RunStatus.NEEDS_REVIEW:
         print("\n  No invoice files were created.")
         if result.review_file:
@@ -1205,6 +1237,7 @@ class InvoiceSplitter:
         validation_ok: bool,
         validation_errors: List[str],
         discard_dir: Optional[Path] = None,
+        duplicates_dir: Optional[Path] = None,
         raw_model_notes: Optional[str] = None,
     ) -> Path:
         manifest = {
@@ -1212,6 +1245,7 @@ class InvoiceSplitter:
             "input_pdf": str(Path(input_pdf).resolve()),
             "output_dir": str(manifest_path.parent.resolve()),
             "discard_dir": str(discard_dir.resolve()) if discard_dir else None,
+            "duplicates_dir": str(duplicates_dir.resolve()) if duplicates_dir else None,
             "model": self.model,
             "total_pages": total_pages,
             "validation_ok": validation_ok,
@@ -1368,22 +1402,8 @@ class InvoiceSplitter:
             invoice_data, validation_ok=ok, validation_errors=errors
         )
 
-        self._write_manifest(
-            manifest_path,
-            input_pdf=str(pdf_path),
-            total_pages=total_pages,
-            analysis_debug={
-                **analysis_debug,
-                "run_status": run_status.value,
-                "quality_reasons": quality_reasons,
-                "warnings": warnings,
-            },
-            invoices=invoice_data,
-            discards=discard_data,
-            validation_ok=ok and run_status == RunStatus.SUCCESS,
-            validation_errors=errors + quality_reasons,
-            discard_dir=discard_dir,
-        )
+        # Initial assessment manifest is written after DB annotation so duplicate fields are preserved.
+        # This write is delayed until after the invoices have been checked and potentially moved.
 
         if run_status != RunStatus.SUCCESS:
             logger.error("Run not trusted for auto-split: %s", quality_reasons)
@@ -1395,6 +1415,23 @@ class InvoiceSplitter:
                 validation_errors=errors,
                 warnings=warnings,
             )
+
+        # Annotate invoices with DB existence checks (non-fatal)
+        try:
+            batch = [(str(inv.get("vendor", "")), str(inv.get("invoice_number", ""))) for inv in invoice_data]
+            db_results = check_invoices(batch)
+            for inv, res in zip(invoice_data, db_results):
+                inv["exists_in_db"] = bool(res.get("exists"))
+                if res.get("db_vendor"):
+                    inv["db_vendor"] = res.get("db_vendor")
+                if res.get("vendor_score") is not None:
+                    inv["vendor_score"] = res.get("vendor_score")
+                if inv.get("exists_in_db"):
+                    warnings.append(
+                        f"Invoice {inv.get('invoice_number')} potentially already in DB (vendor score={res.get('vendor_score')})"
+                    )
+        except Exception as e:
+            logger.warning("DB existence check skipped due to error: %s", e)
 
         stem = sanitize_filename_component(pdf_path.stem)
         discard_files: List[Path] = []
@@ -1415,7 +1452,10 @@ class InvoiceSplitter:
                 logger.error("Error writing discard segment: %s", ex)
 
         invoice_files: List[Path] = []
+        duplicate_files: List[Path] = []
         written_invoices: List[Dict[str, Any]] = []
+        duplicates_dir = output_dir / "duplicates"
+        
         for invoice in invoice_data:
             try:
                 vendor = str(invoice.get("vendor", "Unknown"))
@@ -1444,7 +1484,23 @@ class InvoiceSplitter:
                     writer.write(f)
 
                 logger.info("Created: %s", out_path.name)
-                invoice_files.append(out_path)
+                
+                # Check if this is a potential duplicate (exists in DB with 75%+ vendor match)
+                is_duplicate = (
+                    invoice.get("exists_in_db") 
+                    and invoice.get("vendor_score", 0) >= 75
+                )
+                
+                if is_duplicate:
+                    duplicates_dir.mkdir(parents=True, exist_ok=True)
+                    dup_path = duplicates_dir / out_path.name
+                    out_path.rename(dup_path)
+                    logger.info("Moved to duplicates: %s", dup_path.name)
+                    duplicate_files.append(dup_path)
+                    invoice["moved_to_duplicates"] = True
+                else:
+                    invoice_files.append(out_path)
+                
                 written_invoices.append(invoice)
             except Exception as e:
                 logger.error("Error processing invoice row: %s", e)
@@ -1458,6 +1514,24 @@ class InvoiceSplitter:
                 warnings=warnings,
             )
 
+        self._write_manifest(
+            manifest_path,
+            input_pdf=str(pdf_path),
+            total_pages=total_pages,
+            analysis_debug={
+                **analysis_debug,
+                "run_status": run_status.value,
+                "quality_reasons": quality_reasons,
+                "warnings": warnings,
+            },
+            invoices=invoice_data,
+            discards=discard_data,
+            validation_ok=ok and run_status == RunStatus.SUCCESS,
+            validation_errors=errors + quality_reasons,
+            discard_dir=discard_dir,
+            duplicates_dir=duplicates_dir if duplicate_files else None,
+        )
+
         result = RunResult(
             status=RunStatus.SUCCESS,
             input_pdf=pdf_path.resolve(),
@@ -1466,6 +1540,7 @@ class InvoiceSplitter:
             total_pages=total_pages,
             invoice_files=invoice_files,
             discard_files=discard_files,
+            duplicate_files=duplicate_files,
             manifest_path=manifest_path,
             warnings=warnings,
             invoices=written_invoices,

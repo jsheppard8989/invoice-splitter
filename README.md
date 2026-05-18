@@ -108,6 +108,7 @@ invoice-splitter/
 ├── input/<YYYY-MM-DD>/           ← uploaded originals
 └── processed/<YYYY-MM-DD>/
     ├── output_<VENDOR>_<INV>.pdf ← split invoices (send to AP)
+    ├── duplicates/               ← potential re-processed invoices (review first!)
     ├── discard/                  ← summaries, boilerplate (do not send to AP)
     ├── split_manifest_*.json     ← machine-readable run log
     └── RESULTS_<stem>.txt        ← human-readable run report
@@ -139,6 +140,70 @@ print(result.report_path)
 ```
 
 `split_pdf` returns a `RunResult` with `status` of `success`, `needs_review`, or `failed`.
+
+## Database Integration (Optional)
+
+Optionally integrate with a SQL Server database to check whether invoices already exist in your accounts payable system. This prevents re-processing duplicate invoices.
+
+### Configuration
+
+Set these environment variables in `.env`:
+
+```env
+# SQL Server host/instance name
+DB_HOST=SQLP-ONBASE01
+
+# (Optional) Full ODBC connection string. If not provided, a Trusted Connection is built from DB_HOST.
+# DB_CONNECTION_STRING=Driver={ODBC Driver 18 for SQL Server};Server=your-server;Trusted_Connection=yes;Encrypt=no
+
+# (Optional) Custom SQL query to look up existing invoices. Must accept one parameter (?) for invoice number.
+# DB_EXISTING_INVOICE_SQL=SELECT vendor_name FROM dbo.invoices WHERE invoice_number = ?
+```
+
+### How it works
+
+- **Invoice cleaning** — special characters (`-`, `/`, `#`, etc.) are removed before lookup
+- **Windows authentication** — uses current logged-in user's credentials (no passwords stored)
+- **Graceful degradation** — if DB access fails or user lacks permissions, the program continues without DB checks (does not fail)
+- **Fuzzy vendor matching** — splits the provided vendor name against the found database record (score 0–100)
+- **Automatic duplicate handling** — invoices found in the DB with ≥75% vendor name match are automatically moved to `duplicates/` folder for review
+- **Warnings** — if an invoice is flagged as a duplicate, it is noted in the run report with the vendor match score
+
+### Example output
+
+After splitting, invoices will include:
+
+```json
+{
+  "invoice_number": "INV-2026-0001",
+  "vendor": "ABC Supply",
+  "exists_in_db": false,
+  "db_vendor": null,
+  "vendor_score": null,
+  "moved_to_duplicates": false
+}
+```
+
+Or if found as a duplicate (≥75% match):
+
+```json
+{
+  "invoice_number": "INV-2026-0001",
+  "vendor": "ABC Supply",
+  "exists_in_db": true,
+  "db_vendor": "ABC Supply Co.",
+  "vendor_score": 95,
+  "moved_to_duplicates": true
+}
+```
+
+When flagged as a duplicate, the PDF is moved to `processed/<date>/duplicates/` instead of the main output folder. Review this folder before sending to AP to avoid processing invoices twice.
+
+### Testing
+
+```bash
+python -m pytest test_db_check.py -v
+```
 
 ## How it works
 

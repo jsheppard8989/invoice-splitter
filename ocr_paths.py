@@ -10,23 +10,49 @@ from typing import List, Optional
 
 
 def _win_poppler_bin_dirs() -> List[Path]:
+    """Folders containing pdftoppm.exe (oschwartz10612 zip uses .../Library/bin)."""
+    seen: set[str] = set()
+    out: List[Path] = []
+
+    def add(folder: Path) -> None:
+        key = str(folder.resolve()).lower()
+        if key not in seen:
+            seen.add(key)
+            out.append(folder)
+
+    env_bin = os.environ.get("POPPLER_BIN", "").strip()
+    if env_bin:
+        p = Path(env_bin)
+        if (p / "pdftoppm.exe").is_file() or p.name.lower() == "pdftoppm.exe":
+            add(p if p.is_dir() else p.parent)
+
     candidates: List[Path] = [
         Path(r"C:\poppler\Library\bin"),
         Path(r"C:\Program Files\poppler\Library\bin"),
-        Path(r"C:\Program Files (x86)\poppler\Library\bin"),
     ]
-    for base in (Path(r"C:\Program Files"), Path.home() / "poppler"):
+    for base in (
+        Path(r"C:\poppler"),
+        Path(r"C:\Program Files"),
+        Path.home() / "Downloads",
+        Path.home() / "poppler",
+    ):
         if base.is_dir():
-            candidates.extend(base.glob("poppler*/Library/bin"))
-    seen: set[str] = set()
-    out: List[Path] = []
+            candidates.extend(base.glob("**/Library/bin"))
+            candidates.extend(base.glob("**/bin"))
+
     for p in candidates:
-        key = str(p).lower()
-        if key in seen:
-            continue
-        seen.add(key)
         if (p / "pdftoppm.exe").is_file() or (p / "pdftocairo.exe").is_file():
-            out.append(p)
+            add(p)
+
+    for root in (Path(r"C:\poppler"), Path.home() / "Downloads"):
+        if not root.is_dir():
+            continue
+        try:
+            for exe in root.rglob("pdftoppm.exe"):
+                add(exe.parent)
+                break
+        except OSError:
+            pass
     return out
 
 

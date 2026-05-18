@@ -29,12 +29,23 @@ You need BOTH for scanned PDFs. Text-only PDFs work without them.
 
 --- POPPLER (PDF → images) ---
 
-1. Download latest Release asset (.zip) from:
-   https://github.com/oschwartz10612/poppler-windows/releases/
+WRONG download (no .exe, no Library folder):
+  https://poppler.freedesktop.org/  — that is SOURCE CODE (e.g. poppler-26.05.0.tar.xz)
 
-2. Extract the ZIP to a simple path, e.g.:
-   C:\poppler
-   (You should have: C:\poppler\Library\bin\pdftoppm.exe)
+RIGHT download (pre-built Windows .exe files):
+  https://github.com/oschwartz10612/poppler-windows/releases/
+  File name looks like:  Release-26.02.0-0.zip   (under Assets, NOT "Source code")
+
+1. Download that Release-....zip only.
+
+2. Extract to e.g. C:\poppler
+
+3. Open the extracted folder. You should see:
+     poppler-26.02.0\Library\bin\pdftoppm.exe
+   (version number in folder name may differ)
+
+   Use Windows search inside the extracted folder for:  pdftoppm.exe
+   The folder that contains pdftoppm.exe is what you add to PATH.
 
 3. Add Poppler to PATH:
    - Same Environment Variables steps as above

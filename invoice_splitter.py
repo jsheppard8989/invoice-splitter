@@ -23,7 +23,6 @@ import requests
 from pdf2image import convert_from_path
 from pydantic import BaseModel, ConfigDict, Field
 from PyPDF2 import PdfReader, PdfWriter
-import pytesseract
 
 # Load OPENAI_API_KEY (and other vars) from .env next to this file so CLI runs work from any cwd.
 load_dotenv(Path(__file__).resolve().parent / ".env", override=True)
@@ -907,6 +906,8 @@ class InvoiceSplitter:
 
     def _extract_image_based(self, pdf_path: str) -> str:
         try:
+            import pytesseract  # lazy: keeps setup/UI importable; needs >=0.3.13 on Python 3.14+
+
             logger.info("Detected image-based PDF. Running OCR...")
             images = convert_from_path(pdf_path)
             text = ""

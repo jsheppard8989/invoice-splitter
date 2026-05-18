@@ -32,6 +32,11 @@ def install_dependencies() -> None:
         print("Standard install failed — retrying with --user (common on work PCs)...")
         subprocess.check_call(cmd + ["--user"])
 
+    # pytesseract <0.3.13 breaks on Python 3.14+ (removed pkgutil.find_loader)
+    subprocess.check_call(
+        [sys.executable, "-m", "pip", "install", "pytesseract>=0.3.13", "--upgrade"],
+    )
+
 
 def ensure_env_file() -> bool:
     """Copy .env.example to .env if needed. Returns True if a new file was created."""

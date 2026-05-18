@@ -120,6 +120,7 @@ print(result.report_path)
 
 | Issue | Fix |
 |-------|-----|
+| Setup crashes on `find_loader` / `pkgutil` | Python 3.14 + old pytesseract — run `py -3 -m pip install "pytesseract>=0.3.13" --upgrade`, then setup again. Prefer **Python 3.12** on Windows. |
 | Setup checklist not green | Run `Setup Invoice Splitter` again; install missing Poppler/Tesseract |
 | Tesseract / Poppler not found | Install system tools and ensure they are on PATH |
 | API errors | Check `OPENAI_API_KEY` in `.env` |

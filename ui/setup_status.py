@@ -10,7 +10,7 @@ from typing import Any, Dict, List
 
 from dotenv import load_dotenv
 
-from invoice_splitter import _PROJECT_ROOT
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 
 def _check_import(module: str) -> bool:
@@ -42,14 +42,19 @@ def get_setup_status() -> Dict[str, Any]:
 
     steps: List[Dict[str, Any]] = []
 
+    py_ver = sys.version.split()[0]
+    py_detail = f"Using {py_ver} ({sys.executable})"
+    py_ok = sys.version_info >= (3, 9)
+    if sys.version_info >= (3, 14):
+        py_detail += " — Python 3.12 or 3.13 is recommended on Windows for best compatibility"
     steps.append(
         {
             "id": "python",
             "label": "Python 3 installed",
-            "ok": sys.version_info >= (3, 9),
-            "detail": f"Using {sys.version.split()[0]}",
-            "fix": "Install Python 3.9+ from https://www.python.org/downloads/ "
-            "(Windows: check “Add Python to PATH”).",
+            "ok": py_ok,
+            "detail": py_detail,
+            "fix": "Install Python 3.12 from https://www.python.org/downloads/ "
+            "(Windows: check “Add Python to PATH”). Avoid 3.14 until all tools support it.",
         }
     )
 

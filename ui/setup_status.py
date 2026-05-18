@@ -31,7 +31,7 @@ def get_setup_status() -> Dict[str, Any]:
     platform = sys.platform
     if platform == "win32":
         os_name = "Windows"
-        launcher = "Start Invoice Splitter.bat"
+        launcher = "Start Invoice Splitter.vbs"
         setup_launcher = "Setup Invoice Splitter.bat"
     elif platform == "darwin":
         os_name = "macOS"

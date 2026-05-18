@@ -1,4 +1,4 @@
-"""Create a desktop shortcut to launch Invoice Splitter (Windows, Mac, Linux)."""
+"""Create desktop shortcuts to start and stop Invoice Splitter (Windows, Mac, Linux)."""
 
 from __future__ import annotations
 
@@ -9,6 +9,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 SHORTCUT_NAME = "Invoice Splitter"
+STOP_SHORTCUT_NAME = "Stop Invoice Splitter"
 
 
 def _desktop_folder() -> Path:
@@ -26,34 +27,28 @@ def _desktop_folder() -> Path:
 
 def _launcher_path() -> Path:
     if sys.platform == "win32":
+        vbs = ROOT / "Start Invoice Splitter.vbs"
+        if vbs.is_file():
+            return vbs
         return ROOT / "Start Invoice Splitter.bat"
     if sys.platform == "darwin":
         return ROOT / "Start Invoice Splitter.command"
     return ROOT / "run_ui.py"
 
 
-def create_desktop_shortcut() -> Path:
-    """
-    Create or refresh a desktop shortcut. Returns the path to the shortcut file.
-    """
-    desktop = _desktop_folder()
-    desktop.mkdir(parents=True, exist_ok=True)
-    launcher = _launcher_path()
-    if not launcher.is_file() and sys.platform != "linux":
-        raise FileNotFoundError(f"Launcher not found: {launcher}")
-
+def _stop_launcher_path() -> Path:
     if sys.platform == "win32":
-        return _create_windows_shortcut(desktop, launcher)
+        return ROOT / "Stop Invoice Splitter.bat"
     if sys.platform == "darwin":
-        return _create_mac_alias(desktop, launcher)
-    return _create_linux_desktop_entry(desktop)
+        return ROOT / "Stop Invoice Splitter.command"
+    return ROOT / "run_ui.py"
 
 
-def _create_windows_shortcut(desktop: Path, launcher: Path) -> Path:
-    shortcut = desktop / f"{SHORTCUT_NAME}.lnk"
+def _create_windows_shortcut(desktop: Path, launcher: Path, name: str) -> Path:
+    shortcut = desktop / f"{name}.lnk"
     target = str(launcher.resolve())
     workdir = str(ROOT.resolve())
-    desc = "Split multi-invoice PDFs for accounts payable"
+    desc = "Invoice Splitter" if name == SHORTCUT_NAME else "Stop Invoice Splitter"
     ps = f"""
 $WshShell = New-Object -ComObject WScript.Shell
 $Shortcut = $WshShell.CreateShortcut('{shortcut}')
@@ -69,10 +64,9 @@ $Shortcut.Save()
     return shortcut
 
 
-def _create_mac_alias(desktop: Path, launcher: Path) -> Path:
-    alias = desktop / SHORTCUT_NAME
+def _create_mac_alias(desktop: Path, launcher: Path, name: str) -> Path:
+    alias = desktop / name
     target = str(launcher.resolve())
-    # Remove old alias/app with same name so we can recreate cleanly
     if alias.exists():
         if alias.is_symlink() or alias.is_file():
             alias.unlink()
@@ -83,7 +77,7 @@ tell application "Finder"
     set dest to POSIX file "{desktop}"
     set src to POSIX file "{target}"
     set theAlias to make alias file to src at dest
-    set name of theAlias to "{SHORTCUT_NAME}"
+    set name of theAlias to "{name}"
 end tell
 '''
     subprocess.run(["osascript", "-e", script], check=True)
@@ -101,14 +95,37 @@ Version=1.0
 Type=Application
 Name={SHORTCUT_NAME}
 Comment=Split multi-invoice PDFs for accounts payable
-Exec={python} {run_ui}
+Exec={python} {run_ui} --launch
 Path={ROOT.resolve()}
-Terminal=true
+Terminal=false
 Categories=Office;
 """
     entry.write_text(content, encoding="utf-8")
     os.chmod(entry, 0o755)
     return entry
+
+
+def create_desktop_shortcut() -> Path:
+    """Create start (+ stop) desktop shortcuts. Returns the start shortcut path."""
+    desktop = _desktop_folder()
+    desktop.mkdir(parents=True, exist_ok=True)
+    launcher = _launcher_path()
+    if not launcher.is_file() and sys.platform != "linux":
+        raise FileNotFoundError(f"Launcher not found: {launcher}")
+
+    if sys.platform == "win32":
+        start = _create_windows_shortcut(desktop, launcher, SHORTCUT_NAME)
+        stop_launcher = _stop_launcher_path()
+        if stop_launcher.is_file():
+            _create_windows_shortcut(desktop, stop_launcher, STOP_SHORTCUT_NAME)
+        return start
+    if sys.platform == "darwin":
+        start = _create_mac_alias(desktop, launcher, SHORTCUT_NAME)
+        stop_launcher = _stop_launcher_path()
+        if stop_launcher.is_file():
+            _create_mac_alias(desktop, stop_launcher, STOP_SHORTCUT_NAME)
+        return start
+    return _create_linux_desktop_entry(desktop)
 
 
 def main() -> int:
@@ -117,7 +134,13 @@ def main() -> int:
     except Exception as exc:
         print(f"Could not create desktop icon: {exc}")
         return 1
-    print(f"Desktop icon created:\n  {path}")
+    print(f"Desktop shortcuts created (start + stop).")
+    print(f"  Start: {path}")
+    stop = _desktop_folder() / (
+        f"{STOP_SHORTCUT_NAME}.lnk" if sys.platform == "win32" else STOP_SHORTCUT_NAME
+    )
+    if stop.exists():
+        print(f"  Stop:  {stop}")
     return 0
 
 

@@ -173,6 +173,7 @@ def main() -> int:
         try:
             shortcut = create_desktop_shortcut()
             print(f"Desktop icon created: {shortcut}")
+            print('  Stop the app with "Stop Invoice Splitter" in the program folder (or desktop if you add it).')
         except Exception as exc:
             print(f"Note: could not create desktop icon ({exc}).")
             print('Run "Create Desktop Icon.bat" (Windows) or ".command" (Mac) to try again.')

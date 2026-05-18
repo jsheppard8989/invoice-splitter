@@ -55,10 +55,17 @@ Setup installs Python packages, creates `.env`, prompts for your API key, checks
 
 | Platform | Launch |
 |----------|--------|
-| **Windows** | Desktop **Invoice Splitter** or `Start Invoice Splitter.bat` |
+| **Windows** | Desktop **Invoice Splitter** or `Start Invoice Splitter.vbs` (no terminal window) |
 | **Mac** | Desktop **Invoice Splitter** or `Start Invoice Splitter.command` |
 
-Your browser opens to **http://127.0.0.1:5050**. Leave the terminal window open while using the app.
+Your browser opens to **http://127.0.0.1:5050**. The app runs in the background — you do **not** need to keep a terminal open.
+
+| When finished for the day | Action |
+|---------------------------|--------|
+| **Windows** | `Stop Invoice Splitter.bat` |
+| **Mac** | `Stop Invoice Splitter.command` |
+
+Logs (if needed for support): `logs/app.log` in the program folder.
 
 1. Drag PDFs onto the page (or browse)
 2. Click **Split invoices**

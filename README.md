@@ -40,16 +40,42 @@ sudo apt-get install poppler-utils tesseract-ocr
 - `pip install -r requirements.txt`
 - OpenAI API key in `.env` (see `.env.example`)
 
-## First-time setup (recommended)
+## Install from scratch
 
-Copy the project folder to your computer, then:
+**Easiest:** open [`INSTALL-FROM-SCRATCH.txt`](INSTALL-FROM-SCRATCH.txt) — step-by-step copy/paste commands for Windows and Mac.
+
+**Windows (GUI):** double-click `Install from Scratch (Windows).bat` after Python, Tesseract, and Poppler are installed.
+
+**Windows (Command Prompt)** — run from inside the `invoice-splitter` folder:
+
+```bat
+git clone https://github.com/jsheppard8989/invoice-splitter.git
+cd invoice-splitter
+py -3 -m pip install --upgrade pip
+py -3 -m pip install -r requirements.txt
+py -3 setup_program.py
+```
+
+**Mac (Terminal):**
+
+```bash
+git clone https://github.com/jsheppard8989/invoice-splitter.git
+cd invoice-splitter
+python3 -m pip install --upgrade pip
+python3 -m pip install -r requirements.txt
+python3 setup_program.py
+```
+
+Install **Python 3.12**, **Tesseract**, and **Poppler** first (see [Requirements](#requirements)). On Windows, prefer Python 3.12 over 3.14.
+
+## First-time setup (if you already have the folder)
 
 | Platform | Run once |
 |----------|----------|
-| **Windows** | Double-click `Setup Invoice Splitter.bat` |
-| **Mac** | Double-click `Setup Invoice Splitter.command` |
+| **Windows** | `Setup Invoice Splitter.bat` or `Install from Scratch (Windows).bat` |
+| **Mac** | `Setup Invoice Splitter.command` |
 
-Setup installs Python packages, creates `.env`, prompts for your API key, checks Poppler/Tesseract, and creates a desktop icon **Invoice Splitter**.
+Setup installs Python packages, creates `.env`, prompts for your API key, checks Poppler/Tesseract, and creates desktop shortcuts **Invoice Splitter** and **Stop Invoice Splitter**.
 
 ## Daily use
 

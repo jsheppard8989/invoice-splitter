@@ -47,7 +47,7 @@ echo.
 set /p LAUNCH="Start Invoice Splitter now? (Y/n): "
 if /i "!LAUNCH!"=="n" goto :done
 echo.
-start "" "%~dp0Start Invoice Splitter.bat"
+start "" "%~dp0Start Invoice Splitter.vbs"
 
 :done
 echo.

@@ -1,0 +1,109 @@
+Invoice Splitter — install from scratch (copy/paste commands)
+================================================================
+
+Use this when setting up a NEW computer. You need admin rights for some
+installers; pip and setup can usually run without admin.
+
+----------------------------------------------------------------------
+STEP 0 — Install these FIRST (installers, not command line)
+----------------------------------------------------------------------
+
+Windows:
+  1. Python 3.12  https://www.python.org/downloads/
+     CHECK: "Add python.exe to PATH"
+  2. Tesseract    https://github.com/UB-Mannheim/tesseract/wiki
+     CHECK: "Add to PATH" if offered
+  3. Poppler ZIP    https://github.com/oschwartz10612/poppler-windows/releases/
+     Download: Release-XX.X.X-X.zip  (NOT source from poppler.freedesktop.org)
+     Extract to C:\poppler
+     Add to PATH:  C:\poppler\poppler-XX.X.X\Library\bin
+     (Use the folder that contains pdftoppm.exe)
+
+Mac:
+  brew install python@3.12 poppler tesseract
+  (Install Homebrew first if needed: https://brew.sh)
+
+----------------------------------------------------------------------
+STEP 1 — Get the program folder
+----------------------------------------------------------------------
+
+Option A — Git (if Git is installed):
+
+  cd %USERPROFILE%\Desktop
+  git clone https://github.com/jsheppard8989/invoice-splitter.git
+  cd invoice-splitter
+
+Mac/Linux use ~/Desktop instead of %USERPROFILE%\Desktop.
+
+Option B — ZIP:
+  Download from GitHub → Code → Download ZIP
+  Unzip to Desktop\invoice-splitter
+  Then open Command Prompt in that folder:
+
+  cd %USERPROFILE%\Desktop\invoice-splitter
+
+----------------------------------------------------------------------
+STEP 2 — Python packages + API key + desktop icons (Windows)
+----------------------------------------------------------------------
+
+  cd /d "%USERPROFILE%\Desktop\invoice-splitter"
+  py -3 -m pip install --upgrade pip
+  py -3 -m pip install -r requirements.txt
+  py -3 setup_program.py
+
+  (Notepad opens for .env — paste OPENAI_API_KEY=sk-... save and close,
+   then press Enter in the setup window.)
+
+Or double-click:  Setup Invoice Splitter.bat
+
+----------------------------------------------------------------------
+STEP 2 — Mac (Terminal)
+----------------------------------------------------------------------
+
+  cd ~/Desktop/invoice-splitter
+  python3 -m pip install --upgrade pip
+  python3 -m pip install -r requirements.txt
+  python3 setup_program.py
+
+Or double-click:  Setup Invoice Splitter.command
+
+----------------------------------------------------------------------
+STEP 3 — Verify tools (optional)
+----------------------------------------------------------------------
+
+Windows Command Prompt:
+
+  py -3 --version
+  tesseract --version
+  pdftoppm -h
+
+If pdftoppm not found but you installed Poppler, add to .env in program folder:
+
+  POPPLER_BIN=C:\poppler\poppler-26.02.0\Library\bin
+
+(use your real path to the bin folder)
+
+----------------------------------------------------------------------
+STEP 4 — Daily use
+----------------------------------------------------------------------
+
+  Start:  desktop icon "Invoice Splitter"  (or Start Invoice Splitter.vbs)
+  Stop:   desktop icon "Stop Invoice Splitter"
+
+  Browser: http://127.0.0.1:5050
+
+----------------------------------------------------------------------
+STEP 5 — Update later (after code changes on GitHub)
+----------------------------------------------------------------------
+
+  cd path\to\invoice-splitter
+  git pull
+  py -3 -m pip install -r requirements.txt
+
+----------------------------------------------------------------------
+Troubleshooting
+----------------------------------------------------------------------
+
+  • Setup fails on Python 3.14 → use Python 3.12, or run Fix Setup (Windows).bat
+  • Network error in browser → run Stop, then Start again; see logs\app.log
+  • Poppler red in checklist → wrong ZIP (use oschwartz10612 Release zip)

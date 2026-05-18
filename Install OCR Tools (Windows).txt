@@ -1,0 +1,60 @@
+Invoice Splitter — Install Poppler + Tesseract on Windows
+=========================================================
+
+You need BOTH for scanned PDFs. Text-only PDFs work without them.
+
+--- TESSERACT (OCR) ---
+
+1. Download installer:
+   https://github.com/UB-Mannheim/tesseract/wiki
+
+2. Run the installer (admin may be required).
+
+3. On the install screen, note the folder (default):
+   C:\Program Files\Tesseract-OCR
+
+4. IMPORTANT: Check the box "Add to PATH" if the installer offers it.
+   If there is no checkbox, add PATH manually (step 5).
+
+5. Manual PATH (if needed):
+   - Press Windows key, type "environment variables", open
+     "Edit the system environment variables"
+   - Environment Variables → under "User variables" select Path → Edit
+   - New → paste:  C:\Program Files\Tesseract-OCR
+   - OK on all dialogs
+   - Close and reopen any Command Prompt / setup windows
+
+6. Test in Command Prompt:
+   tesseract --version
+
+--- POPPLER (PDF → images) ---
+
+1. Download latest Release asset (.zip) from:
+   https://github.com/oschwartz10612/poppler-windows/releases/
+
+2. Extract the ZIP to a simple path, e.g.:
+   C:\poppler
+   (You should have: C:\poppler\Library\bin\pdftoppm.exe)
+
+3. Add Poppler to PATH:
+   - Same Environment Variables steps as above
+   - New → paste:  C:\poppler\Library\bin
+   - OK on all dialogs
+   - Close and reopen Command Prompt
+
+4. Test in Command Prompt:
+   pdftoppm -h
+
+--- FINISH ---
+
+1. Double-click "Setup Invoice Splitter.bat" again.
+   Poppler and Tesseract should show [ OK ].
+
+2. If still red but files exist in the folders above:
+   - Run "Fix Setup (Windows).bat" after git pull (auto-detects default folders)
+   - Or log off Windows and back on (refreshes PATH)
+
+--- NO ADMIN RIGHTS? ---
+
+Ask IT to install Tesseract-OCR and Poppler, or install to your user folder
+and add only your user PATH (no admin needed for user PATH).

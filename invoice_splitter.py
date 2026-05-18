@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 from dotenv import load_dotenv
+from ocr_paths import configure_ocr_path
 import requests
 from pdf2image import convert_from_path
 from pydantic import BaseModel, ConfigDict, Field
@@ -26,6 +27,7 @@ from PyPDF2 import PdfReader, PdfWriter
 
 # Load OPENAI_API_KEY (and other vars) from .env next to this file so CLI runs work from any cwd.
 load_dotenv(Path(__file__).resolve().parent / ".env", override=True)
+configure_ocr_path()
 
 # Configure logging
 logging.basicConfig(

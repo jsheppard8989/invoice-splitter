@@ -10,6 +10,8 @@ from typing import Any, Dict, List
 
 from dotenv import load_dotenv
 
+from ocr_paths import find_pdftoppm, find_tesseract
+
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 
@@ -100,7 +102,7 @@ def get_setup_status() -> Dict[str, Any]:
         }
     )
 
-    poppler = shutil.which("pdftoppm") or shutil.which("pdftocairo")
+    poppler = find_pdftoppm()
     steps.append(
         {
             "id": "poppler",
@@ -114,7 +116,7 @@ def get_setup_status() -> Dict[str, Any]:
         }
     )
 
-    tesseract = shutil.which("tesseract")
+    tesseract = find_tesseract()
     steps.append(
         {
             "id": "tesseract",

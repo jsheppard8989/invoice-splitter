@@ -38,7 +38,9 @@ env/
 *~
 
 # Output directories
+input/
 output/
+processed/
 temp_split/
 processed_invoices/
 

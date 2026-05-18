@@ -1,213 +1,146 @@
 # Invoice Splitter
 
-A robust, low-cost AI-powered tool to automatically split large PDF files containing multiple invoices into individual invoice files. Handles both text-based and scanned (image-based) PDFs with intelligent invoice boundary detection.
+Split multi-invoice PDFs into individual files for accounts payable. Works with text-based and scanned PDFs using GPT-4o-mini, validation, discard handling, and a local web UI.
 
 ## Features
 
-✨ **Key Capabilities**
-- **Dual PDF Support**: Works with both text-based and scanned (image-based) PDFs
-- **Automatic Detection**: Detects PDF type and uses appropriate extraction method
-- **OCR for Scanned PDFs**: Uses Tesseract OCR for image-based documents
-- **AI-Powered Parsing**: GPT-4o-mini identifies invoice boundaries with common sense
-- **Zero Data Loss**: Every page assigned to an invoice, nothing skipped
-- **Multi-Vendor**: Handles different invoice formats and vendors automatically
-- **Low Cost**: Uses GPT-4o-mini (~$0.01-0.05 per PDF)
-- **Easy to Use**: Single command, automatic output naming
-- **Production Ready**: Error handling, logging, and validation included
+- **Web UI** — drag-and-drop PDFs, batch processing, open today’s folders in Finder/Explorer
+- **Scanned PDFs** — Poppler converts pages to images; Tesseract OCR reads text (both required)
+- **Text PDFs** — direct extraction with PyPDF2 when the PDF has selectable text
+- **AI splitting** — GPT-4o-mini finds invoice packets vs summary/boilerplate discards
+- **Fail-closed** — validation and quality checks; uncertain runs produce a `NEEDS_REVIEW` PDF instead of bad splits
+- **Run reports** — `RESULTS_<file>.txt` and `split_manifest_*.json` per run
+- **Desktop shortcut** — created automatically during setup (Windows & Mac)
 
 ## Requirements
 
-### System Dependencies
+### System (required for scanned PDFs)
 
-**Tesseract OCR** (required for scanned PDFs):
+| Tool | Role |
+|------|------|
+| **Poppler** (`pdftoppm`) | Converts each PDF page to an image |
+| **Tesseract** | OCR — reads text from those images |
+
 ```bash
-# Ubuntu/Debian
-sudo apt-get install tesseract-ocr
-
 # macOS
-brew install tesseract
+brew install poppler tesseract
+
+# Ubuntu/Debian
+sudo apt-get install poppler-utils tesseract-ocr
 
 # Windows
-# Download from: https://github.com/UB-Mannheim/tesseract/wiki
+# Poppler: https://github.com/oschwartz10612/poppler-windows/releases/
+# Tesseract: https://github.com/UB-Mannheim/tesseract/wiki
+# Add both install folders to your PATH.
 ```
 
-**Poppler** (required for PDF to image conversion):
-```bash
-# Ubuntu/Debian
-sudo apt-get install poppler-utils
+### Python
 
-# macOS
-brew install poppler
+- Python 3.9+
+- `pip install -r requirements.txt`
+- OpenAI API key in `.env` (see `.env.example`)
 
-# Windows
-# Download from: https://github.com/oschwartz10612/poppler-windows/releases/
+## First-time setup (recommended)
+
+Copy the project folder to your computer, then:
+
+| Platform | Run once |
+|----------|----------|
+| **Windows** | Double-click `Setup Invoice Splitter.bat` |
+| **Mac** | Double-click `Setup Invoice Splitter.command` |
+
+Setup installs Python packages, creates `.env`, prompts for your API key, checks Poppler/Tesseract, and creates a desktop icon **Invoice Splitter**.
+
+## Daily use
+
+| Platform | Launch |
+|----------|--------|
+| **Windows** | Desktop **Invoice Splitter** or `Start Invoice Splitter.bat` |
+| **Mac** | Desktop **Invoice Splitter** or `Start Invoice Splitter.command` |
+
+Your browser opens to **http://127.0.0.1:5050**. Leave the terminal window open while using the app.
+
+1. Drag PDFs onto the page (or browse)
+2. Click **Split invoices**
+3. Use **Open today’s invoices** / **Open discard folder** for output
+
+To recreate only the desktop icon: `Create Desktop Icon.bat` (Windows) or `Create Desktop Icon.command` (Mac).
+
+## Where files go
+
+For each calendar day:
+
+```
+invoice-splitter/
+├── input/<YYYY-MM-DD>/           ← uploaded originals
+└── processed/<YYYY-MM-DD>/
+    ├── output_<VENDOR>_<INV>.pdf ← split invoices (send to AP)
+    ├── discard/                  ← summaries, boilerplate (do not send to AP)
+    ├── split_manifest_*.json     ← machine-readable run log
+    └── RESULTS_<stem>.txt        ← human-readable run report
 ```
 
-### Python Dependencies
+If the run is not trusted, you also get `output_NEEDS_REVIEW_<stem>_<timestamp>.pdf` containing the full original for manual handling.
+
+## Command line (optional)
 
 ```bash
-pip install -r requirements.txt
+python invoice_splitter.py invoices.pdf
+python invoice_splitter.py invoices.pdf ./custom_output --open
 ```
 
-## Installation
+Default output directory is `processed/<today>/` (same as the web UI).
 
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/jsheppard8989/invoice-splitter.git
-   cd invoice-splitter
-   ```
+### Python API
 
-2. **Install system dependencies** (see Requirements above)
-
-3. **Install Python dependencies**
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-4. **Set up OpenAI API key**
-   ```bash
-   export OPENAI_API_KEY=sk-your-key-here
-   ```
-   
-   Or create a `.env` file:
-   ```
-   OPENAI_API_KEY=sk-your-key-here
-   ```
-
-## Quick Start
-
-### Basic Usage
-
-```bash
-python invoice_splitter.py large_invoices.pdf
-```
-
-This will:
-1. Analyze the PDF (auto-detect if text or image-based)
-2. Extract text (with OCR if needed)
-3. Use AI to identify invoice boundaries
-4. Split into individual PDFs
-5. Save to `./output/` directory with names like `output_VENDOR_INVOICENUMBER.pdf`
-
-### Advanced Usage
-
-```bash
-# Specify output directory
-python invoice_splitter.py invoices.pdf ./my_output_folder
-
-# Use in Python code
+```python
 from invoice_splitter import InvoiceSplitter
 
-splitter = InvoiceSplitter(api_key="sk-your-key")
-output_files = splitter.split_pdf("invoices.pdf", "output")
-print(f"Created {len(output_files)} invoices")
+splitter = InvoiceSplitter()
+result = splitter.split_pdf("invoices.pdf")  # optional output_dir
+
+print(result.headline())
+print(result.invoice_files)   # list of Path
+print(result.discard_files)
+print(result.report_path)
 ```
 
-## How It Works
+`split_pdf` returns a `RunResult` with `status` of `success`, `needs_review`, or `failed`.
 
-### 1. PDF Type Detection
-- Attempts to extract text from the first page
-- If successful (>50 characters), treats as text-based PDF
-- Otherwise, uses OCR for image-based (scanned) PDFs
+## How it works
 
-### 2. Text Extraction
-- **Text PDFs**: Direct text extraction using PyPDF2
-- **Image PDFs**: Tesseract OCR processes each page and extracts text
-
-### 3. Invoice Parsing with AI
-- Sends extracted text to GPT-4o-mini
-- AI identifies:
-  - Invoice boundaries (start/end pages)
-  - Vendor/company names
-  - Invoice numbers
-  - Page ranges for multi-page invoices
-- Ensures every page is assigned to an invoice
-
-### 4. PDF Splitting
-- Creates separate PDF files for each invoice
-- Names files: `output_<VENDOR>_<INVOICENUMBER>.pdf`
-- Saves to output directory
-
-## Output
-
-The tool creates individual PDF files named like:
-```
-output_ACME_Corp_INV-2024-001.pdf
-output_Vendor_XYZ_INV-85432.pdf
-output_Global_Services_2024-05-14-001.pdf
-```
-
-Each file contains only the pages for that specific invoice.
+1. **Extract text** — PyPDF2 for text PDFs; Poppler + Tesseract for scanned
+2. **Analyze** — single LLM call for small PDFs; chunked boundary + metadata passes for large ones
+3. **Refine** — reconcile discards, merge packets across blank separators, build final discard list
+4. **Validate** — every page assigned exactly once (invoice or discard)
+5. **Quality gate** — duplicate invoice numbers, missing IDs, etc. → `NEEDS_REVIEW`
+6. **Write** — invoice PDFs, discard PDFs, manifest, and `RESULTS_*.txt`
 
 ## Troubleshooting
 
-### "Tesseract not found" Error
-Install Tesseract OCR for your OS (see Requirements section)
+| Issue | Fix |
+|-------|-----|
+| Setup checklist not green | Run `Setup Invoice Splitter` again; install missing Poppler/Tesseract |
+| Tesseract / Poppler not found | Install system tools and ensure they are on PATH |
+| API errors | Check `OPENAI_API_KEY` in `.env` |
+| Poor splits | Open `RESULTS_*.txt` and `split_manifest_*.json`; use the `NEEDS_REVIEW` PDF |
 
-### "Poppler not found" Error
-Install poppler utilities for your OS (see Requirements section)
+## Cost
 
-### API Errors
-- Verify your OpenAI API key is valid
-- Check you have sufficient API credits
-- Ensure you're using a valid OpenAI organization
+Roughly **$0.01–0.05 per PDF** (GPT-4o-mini tokens). OCR runs locally at no API cost.
 
-### Poor OCR Quality
-- PDFs with very low resolution may have poor OCR results
-- Consider increasing DPI if you control PDF generation
-- For business PDFs, typically 150-200 DPI is sufficient
+## Tests
 
-### AI Misidentifies Invoice Boundaries
-- Large multi-vendor PDFs may occasionally need manual review
-- Check output files to verify splits are correct
-- Adjust prompts in `_parse_invoices_with_ai()` if needed
-
-## Cost Estimate
-
-- **Text-based PDF** (100 pages): ~$0.01-0.02
-- **Scanned PDF** (100 pages): ~$0.02-0.05
-  - OCR processing happens locally (free)
-  - Only AI parsing costs (tokens)
-
-## Architecture
-
+```bash
+python -m pytest test_invoice_splitter.py -q
 ```
-invoice_splitter.py
-├── InvoiceSplitter (main class)
-│   ├── _is_text_based_pdf()        # Detect PDF type
-│   ├── _extract_text_based()       # Extract from text PDFs
-│   ├── _extract_image_based()      # OCR scanned PDFs
-│   ├── _extract_text()             # Auto-detect and extract
-│   ├── _parse_invoices_with_ai()   # AI parsing
-│   └── split_pdf()                 # Main workflow
-└── CLI interface
-```
-
-## License
-
-MIT License - Free for commercial and personal use
-
-## Support
-
-For issues or questions:
-1. Check the Troubleshooting section
-2. Review logs for error messages
-3. Test with a small PDF first to verify setup
-
-## Performance Notes
-
-- **First run**: May be slower as dependencies install
-- **OCR processing**: Scanned PDFs take longer (proportional to page count)
-- **API rate limits**: OpenAI API has rate limits; batching jobs is recommended
-- **Memory**: Large PDFs (500+ pages) may use significant memory
 
 ## Security
 
-- API keys are never logged
+- API keys live in `.env` (not committed)
 - PDFs are processed locally
-- No data is retained after processing
-- Specify `.env` file for secure key management
+- `.env` is listed in `.gitignore`
 
----
+## License
 
-**Made with ❤️ for invoice management**
+MIT License

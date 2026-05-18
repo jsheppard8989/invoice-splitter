@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Invoice Splitter</title>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --surface: #1a2332;
+      --surface2: #243044;
+      --border: #2d3a4f;
+      --text: #e8edf4;
+      --muted: #8b9cb3;
+      --accent: #3b82f6;
+      --accent-hover: #2563eb;
+      --success: #22c55e;
+      --warn: #f59e0b;
+      --danger: #ef4444;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+    .wrap { max-width: 720px; margin: 0 auto; padding: 2rem 1.25rem 3rem; }
+    h1 { font-size: 1.75rem; font-weight: 600; margin: 0 0 0.35rem; }
+    .sub { color: var(--muted); margin: 0 0 1.75rem; font-size: 0.95rem; }
+    .folders {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-bottom: 1.5rem;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.55rem 1rem;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--surface2);
+      color: var(--text);
+      font-size: 0.875rem;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .btn:hover { background: var(--border); border-color: var(--muted); }
+    .btn-primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+    .btn-primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+    .drop {
+      border: 2px dashed var(--border);
+      border-radius: 12px;
+      padding: 2.5rem 1.5rem;
+      text-align: center;
+      background: var(--surface);
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+    }
+    .drop.dragover {
+      border-color: var(--accent);
+      background: rgba(59, 130, 246, 0.08);
+    }
+    .drop p { margin: 0.5rem 0 0; color: var(--muted); font-size: 0.9rem; }
+    .drop .icon { font-size: 2.5rem; opacity: 0.7; }
+    input[type="file"] { display: none; }
+    .status-bar {
+      margin-top: 1.25rem;
+      padding: 0.75rem 1rem;
+      border-radius: 8px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      font-size: 0.9rem;
+      display: none;
+    }
+    .status-bar.visible { display: block; }
+    .status-bar.processing { border-color: var(--accent); }
+    .results { margin-top: 1.5rem; }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1rem 1.1rem;
+      margin-bottom: 0.75rem;
+    }
+    .card h3 { margin: 0 0 0.35rem; font-size: 1rem; word-break: break-all; }
+    .card .headline { font-size: 0.9rem; margin-bottom: 0.5rem; }
+    .badge {
+      display: inline-block;
+      padding: 0.15rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+    .badge.success { background: rgba(34, 197, 94, 0.2); color: var(--success); }
+    .badge.needs_review { background: rgba(245, 158, 11, 0.2); color: var(--warn); }
+    .badge.failed { background: rgba(239, 68, 68, 0.2); color: var(--danger); }
+    .meta { color: var(--muted); font-size: 0.85rem; }
+    .meta ul { margin: 0.35rem 0 0; padding-left: 1.2rem; }
+    .paths {
+      margin-top: 1rem;
+      padding: 0.75rem;
+      background: var(--surface2);
+      border-radius: 8px;
+      font-size: 0.8rem;
+      color: var(--muted);
+      word-break: break-all;
+    }
+    .paths dt { font-weight: 600; color: var(--text); margin-top: 0.35rem; }
+    .paths dt:first-child { margin-top: 0; }
+    .setup {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1rem 1.1rem;
+      margin-bottom: 1.25rem;
+    }
+    .setup.ready { border-color: rgba(34, 197, 94, 0.4); }
+    .setup.not-ready { border-color: rgba(245, 158, 11, 0.5); }
+    .setup-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 0.75rem;
+    }
+    .setup-head h2 { margin: 0; font-size: 1rem; }
+    .setup-toggle {
+      flex-shrink: 0;
+      padding: 0.35rem 0.65rem;
+      font-size: 0.8rem;
+    }
+    .setup.collapsed .setup-details,
+    .setup.collapsed .meta-line { display: none; }
+    .setup.collapsed.ready .setup-head { margin-bottom: 0.35rem; }
+    .setup-collapsed-summary {
+      display: none;
+      margin: 0;
+      font-size: 0.9rem;
+      color: var(--success);
+    }
+    .setup.collapsed.ready .setup-collapsed-summary { display: block; }
+    .setup ol { margin: 0; padding-left: 1.25rem; }
+    .setup li { margin-bottom: 0.65rem; font-size: 0.9rem; }
+    .setup li.ok { color: var(--success); }
+    .setup li.fail { color: var(--warn); }
+    .setup .fix { color: var(--muted); font-size: 0.82rem; margin-top: 0.2rem; }
+    .setup .meta-line { color: var(--muted); font-size: 0.85rem; margin-bottom: 0.75rem; }
+    .drop.disabled { opacity: 0.45; pointer-events: none; }
+    .queue {
+      margin-top: 1rem;
+      padding: 0.75rem 1rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+    }
+    .queue h3 { margin: 0 0 0.5rem; font-size: 0.95rem; }
+    .queue ul { margin: 0; padding-left: 1.2rem; max-height: 140px; overflow-y: auto; font-size: 0.88rem; color: var(--muted); }
+    .queue[hidden] { display: none; }
+    .run-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-top: 1rem;
+      align-items: center;
+    }
+    .run-row .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+    .guide { margin-top: 1rem; }
+    .guide h2 { font-size: 1rem; margin: 0 0 0.5rem; }
+    .guide p { color: var(--muted); font-size: 0.88rem; margin: 0 0 0.75rem; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Invoice Splitter</h1>
+    <p class="sub">Works on Windows and Mac. First time on a new PC? Run <strong id="setupLauncherHint">Setup Invoice Splitter</strong> (creates a desktop icon). Then open <strong id="dailyLauncherHint">Invoice Splitter</strong> from your desktop each day.</p>
+
+    <section class="setup not-ready" id="setupPanel" aria-live="polite">
+      <div class="setup-head">
+        <h2 id="setupTitle">Setup checklist</h2>
+        <button type="button" class="btn setup-toggle" id="setupToggle" hidden aria-controls="setupList" aria-expanded="false">Show details</button>
+      </div>
+      <p class="setup-collapsed-summary" id="setupCollapsedSummary"></p>
+      <p class="meta-line" id="setupMeta">Checking this computer…</p>
+      <ol id="setupList" class="setup-details"></ol>
+    </section>
+
+    <div class="folders">
+      <button type="button" class="btn btn-primary" data-folder="output">Open today’s invoices</button>
+      <button type="button" class="btn" data-folder="discard">Open discard folder</button>
+      <button type="button" class="btn" data-folder="input">Open uploaded files</button>
+      <button type="button" class="btn" data-folder="program">Open program folder</button>
+    </div>
+
+    <div class="drop" id="dropzone" role="button" tabindex="0" aria-label="Drop PDF files here">
+      <div class="icon">📄</div>
+      <strong>Drag &amp; drop PDFs here to add them</strong>
+      <p>or click to browse — add many files, then click Split invoices</p>
+      <input type="file" id="fileInput" accept=".pdf,application/pdf" multiple />
+    </div>
+
+    <div class="queue" id="queuePanel" hidden>
+      <h3>Ready to split (<span id="queueCount">0</span> PDF<span id="queuePlural">s</span>)</h3>
+      <ul id="queueList"></ul>
+    </div>
+
+    <div class="run-row">
+      <button type="button" id="splitBtn" class="btn btn-primary" disabled>Split invoices</button>
+      <button type="button" id="clearBtn" class="btn">Clear list</button>
+    </div>
+
+    <div class="status-bar" id="statusBar"></div>
+    <div class="results" id="results"></div>
+
+    <section class="guide paths">
+      <h2>Where files go (today: {{ folders.date }})</h2>
+      <p>Paths work the same on Windows and Mac. Click the buttons above instead of typing these paths.</p>
+      <dt>Split invoices (send to AP)</dt>
+      <dd>{{ folders.output }}</dd>
+      <dt>Discarded pages (do not send to AP)</dt>
+      <dd>{{ folders.discard }}</dd>
+      <dt>Uploaded originals (from drag &amp; drop)</dt>
+      <dd>{{ folders.input }}</dd>
+    </section>
+  </div>
+
+  <script>
+    const dropzone = document.getElementById("dropzone");
+    const setupPanel = document.getElementById("setupPanel");
+    const setupList = document.getElementById("setupList");
+    const setupMeta = document.getElementById("setupMeta");
+    const setupToggle = document.getElementById("setupToggle");
+    const setupCollapsedSummary = document.getElementById("setupCollapsedSummary");
+    const SETUP_EXPANDED_KEY = "invoiceSplitter_setupExpanded";
+    let setupReady = false;
+
+    function setSetupCollapsed(collapsed) {
+      setupPanel.classList.toggle("collapsed", collapsed);
+      setupToggle.textContent = collapsed ? "Show details" : "Hide details";
+      setupToggle.setAttribute("aria-expanded", String(!collapsed));
+    }
+
+    setupToggle.addEventListener("click", () => {
+      const collapsed = !setupPanel.classList.contains("collapsed");
+      setSetupCollapsed(collapsed);
+      sessionStorage.setItem(SETUP_EXPANDED_KEY, collapsed ? "" : "1");
+    });
+    const fileInput = document.getElementById("fileInput");
+    const statusBar = document.getElementById("statusBar");
+    const resultsEl = document.getElementById("results");
+    const queuePanel = document.getElementById("queuePanel");
+    const queueList = document.getElementById("queueList");
+    const queueCount = document.getElementById("queueCount");
+    const queuePlural = document.getElementById("queuePlural");
+    const splitBtn = document.getElementById("splitBtn");
+    const clearBtn = document.getElementById("clearBtn");
+    let pendingFiles = [];
+
+    function updateQueueUI() {
+      const n = pendingFiles.length;
+      queuePanel.hidden = n === 0;
+      queueCount.textContent = String(n);
+      queuePlural.textContent = n === 1 ? "" : "s";
+      queueList.innerHTML = pendingFiles
+        .map((f) => `<li>${escapeHtml(f.name)}</li>`)
+        .join("");
+      splitBtn.disabled = !setupReady || n === 0;
+    }
+
+    function addFiles(fileList) {
+      const pdfs = [...fileList].filter((f) => f.name.toLowerCase().endsWith(".pdf"));
+      if (!pdfs.length) {
+        setStatus("Only PDF files can be added.");
+        return;
+      }
+      pendingFiles.push(...pdfs);
+      updateQueueUI();
+      setStatus(
+        pdfs.length === 1
+          ? `Added 1 file (${pendingFiles.length} total). Click Split invoices when ready.`
+          : `Added ${pdfs.length} files (${pendingFiles.length} total). Click Split invoices when ready.`
+      );
+    }
+
+    dropzone.addEventListener("click", (e) => {
+      if (e.target === fileInput) return;
+      fileInput.click();
+    });
+    dropzone.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); fileInput.click(); }
+    });
+
+    ["dragenter", "dragover"].forEach((ev) => {
+      dropzone.addEventListener(ev, (e) => {
+        e.preventDefault();
+        dropzone.classList.add("dragover");
+      });
+    });
+    ["dragleave", "drop"].forEach((ev) => {
+      dropzone.addEventListener(ev, (e) => {
+        e.preventDefault();
+        dropzone.classList.remove("dragover");
+      });
+    });
+
+    dropzone.addEventListener("drop", (e) => {
+      if (e.dataTransfer.files.length) addFiles(e.dataTransfer.files);
+    });
+    fileInput.addEventListener("change", () => {
+      if (fileInput.files.length) addFiles(fileInput.files);
+      fileInput.value = "";
+    });
+
+    splitBtn.addEventListener("click", () => {
+      if (!pendingFiles.length) return;
+      const batch = pendingFiles.slice();
+      processFiles(batch);
+    });
+
+    clearBtn.addEventListener("click", () => {
+      pendingFiles = [];
+      updateQueueUI();
+      resultsEl.innerHTML = "";
+      setStatus("Cleared file list.");
+    });
+
+    document.querySelectorAll("[data-folder]").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const which = btn.getAttribute("data-folder");
+        await fetch("/api/open-folder", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ which }),
+        });
+      });
+    });
+
+    async function loadSetup() {
+      try {
+        const res = await fetch("/api/setup-status");
+        const data = await res.json();
+        setupReady = !!data.ready;
+        setupPanel.classList.toggle("ready", setupReady);
+        setupPanel.classList.toggle("not-ready", !setupReady);
+        dropzone.classList.toggle("disabled", !setupReady);
+        splitBtn.disabled = !setupReady || pendingFiles.length === 0;
+        document.getElementById("setupLauncherHint").textContent = data.setup_launcher || "Setup Invoice Splitter";
+        document.getElementById("dailyLauncherHint").textContent = data.launcher || "Start Invoice Splitter";
+        setupMeta.textContent = setupReady
+          ? `${data.platform} — ready. Daily use: ${data.launcher}`
+          : `${data.platform} — run ${data.setup_launcher || "setup"} or complete the steps below.`;
+        setupCollapsedSummary.textContent = setupReady
+          ? `✓ All requirements met — ${data.platform}`
+          : "";
+        setupList.innerHTML = data.steps.map((s) => {
+          const cls = s.ok ? "ok" : (s.optional ? "" : "fail");
+          const tag = s.ok ? "✓" : (s.optional ? "○" : "✗");
+          const opt = s.optional ? " (optional)" : "";
+          const sub = s.sublabel ? `<br><span class="fix">${escapeHtml(s.sublabel)}</span>` : "";
+          const fix = !s.ok && s.fix ? `<div class="fix">${escapeHtml(s.fix)}</div>` : "";
+          return `<li class="${cls}"><strong>${tag} ${escapeHtml(s.label)}</strong>${opt}${sub}<br><span class="fix">${escapeHtml(s.detail)}</span>${fix}</li>`;
+        }).join("");
+        if (setupReady) {
+          setupToggle.hidden = false;
+          const userExpanded = sessionStorage.getItem(SETUP_EXPANDED_KEY) === "1";
+          setSetupCollapsed(!userExpanded);
+        } else {
+          setupToggle.hidden = true;
+          setupPanel.classList.remove("collapsed");
+          setupToggle.setAttribute("aria-expanded", "true");
+        }
+      } catch (e) {
+        setupMeta.textContent = "Could not load setup status.";
+      }
+    }
+    loadSetup();
+
+    function setStatus(msg, processing) {
+      statusBar.textContent = msg;
+      statusBar.classList.add("visible");
+      statusBar.classList.toggle("processing", !!processing);
+    }
+
+    function badgeClass(status) {
+      if (status === "success") return "success";
+      if (status === "needs_review") return "needs_review";
+      return "failed";
+    }
+
+    function renderResults(data) {
+      const s = data.summary;
+      let html = "";
+      if (s.processed > 1) {
+        html += `<div class="card"><strong>Batch:</strong> ${s.success} OK, ${s.needs_review} need review, ${s.failed} failed</div>`;
+      }
+      for (const r of data.results) {
+        html += `<div class="card">
+          <span class="badge ${badgeClass(r.status)}">${r.status.replace("_", " ")}</span>
+          <h3>${escapeHtml(r.filename)}</h3>
+          <p class="headline">${escapeHtml(r.headline)}</p>
+          <p class="meta">${r.invoice_count} invoice file(s)`;
+        if (r.discard_count) html += ` · ${r.discard_count} discard file(s)`;
+        html += `</p>`;
+        if (r.reasons && r.reasons.length) {
+          html += `<ul class="meta">${r.reasons.map((x) => `<li>${escapeHtml(x)}</li>`).join("")}</ul>`;
+        }
+        if (r.warnings && r.warnings.length) {
+          html += `<p class="meta"><strong>Note:</strong> ${r.warnings.map(escapeHtml).join(" ")}</p>`;
+        }
+        html += `</div>`;
+      }
+      resultsEl.innerHTML = html;
+    }
+
+    function escapeHtml(s) {
+      const d = document.createElement("div");
+      d.textContent = s;
+      return d.innerHTML;
+    }
+
+    async function processFiles(fileList) {
+      if (!setupReady) {
+        setStatus("Complete the setup checklist above before processing PDFs.");
+        return;
+      }
+      const pdfs = [...fileList].filter((f) => f.name.toLowerCase().endsWith(".pdf"));
+      if (!pdfs.length) {
+        setStatus("No PDF files to split.");
+        return;
+      }
+      splitBtn.disabled = true;
+      setStatus(`Splitting ${pdfs.length} PDF(s)… please wait (this may take a few minutes).`, true);
+      resultsEl.innerHTML = "";
+
+      const form = new FormData();
+      pdfs.forEach((f) => form.append("files", f));
+
+      try {
+        const res = await fetch("/api/process", { method: "POST", body: form });
+        const data = await res.json();
+        if (!res.ok) {
+          setStatus(data.error || "Processing failed.");
+          updateQueueUI();
+          return;
+        }
+        renderResults(data);
+        pendingFiles = [];
+        updateQueueUI();
+        const s = data.summary;
+        if (s.processed > 1) {
+          if (s.all_ok) {
+            setStatus(`Done — all ${s.success} PDFs split successfully. Open today’s invoices folder.`);
+          } else if (s.any_review) {
+            setStatus(`Done — ${s.success} OK, ${s.needs_review} need review, ${s.failed} failed. See below.`);
+          } else {
+            setStatus(`Done — ${s.success} OK, ${s.failed} failed. See below.`);
+          }
+        } else if (s.all_ok) {
+          setStatus("Done — split successfully. Open today’s invoices folder.");
+        } else if (s.any_review) {
+          setStatus("Needs manual review — see details below.");
+        } else {
+          setStatus("Finished with errors. See details below.");
+        }
+      } catch (err) {
+        setStatus("Network error: " + err.message);
+        updateQueueUI();
+      }
+    }
+  </script>
+</body>
+</html>

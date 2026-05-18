@@ -446,7 +446,16 @@
 
       try {
         const res = await fetch("/api/process", { method: "POST", body: form });
-        const data = await res.json();
+        let data;
+        try {
+          data = await res.json();
+        } catch (_) {
+          setStatus(
+            "Server stopped or returned a bad response. Check the black Invoice Splitter window for a red error, then restart Start Invoice Splitter.bat."
+          );
+          updateQueueUI();
+          return;
+        }
         if (!res.ok) {
           setStatus(data.error || "Processing failed.");
           updateQueueUI();
@@ -472,7 +481,11 @@
           setStatus("Finished with errors. See details below.");
         }
       } catch (err) {
-        setStatus("Network error: " + err.message);
+        setStatus(
+          "Lost connection to the local app. Keep the Invoice Splitter terminal window open while splitting. " +
+          "If that window closed or shows an error, close it and run Start Invoice Splitter.bat again. " +
+          "(" + err.message + ")"
+        );
         updateQueueUI();
       }
     }

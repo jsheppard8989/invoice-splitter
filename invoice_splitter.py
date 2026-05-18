@@ -19,7 +19,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 from dotenv import load_dotenv
-from ocr_paths import configure_ocr_path
+from ocr_paths import configure_ocr_path, poppler_bin_dir, tesseract_cmd
 import requests
 from pdf2image import convert_from_path
 from pydantic import BaseModel, ConfigDict, Field
@@ -911,7 +911,16 @@ class InvoiceSplitter:
             import pytesseract  # lazy: keeps setup/UI importable; needs >=0.3.13 on Python 3.14+
 
             logger.info("Detected image-based PDF. Running OCR...")
-            images = convert_from_path(pdf_path)
+            poppler = poppler_bin_dir()
+            if poppler:
+                logger.info("Using Poppler from: %s", poppler)
+            convert_kwargs: Dict[str, Any] = {}
+            if poppler:
+                convert_kwargs["poppler_path"] = poppler
+            images = convert_from_path(pdf_path, **convert_kwargs)
+            tcmd = tesseract_cmd()
+            if tcmd:
+                pytesseract.pytesseract.tesseract_cmd = tcmd
             text = ""
             for page_num, image in enumerate(images, 1):
                 logger.info("  OCR processing page %s/%s...", page_num, len(images))

@@ -6,6 +6,7 @@ Run: python run_ui.py
 from __future__ import annotations
 
 import logging
+import traceback
 from datetime import date, datetime
 from pathlib import Path
 from typing import Any, Dict, List
@@ -28,7 +29,14 @@ UI_DIR = Path(__file__).resolve().parent
 app = Flask(__name__, template_folder=str(UI_DIR / "templates"))
 app.config["MAX_CONTENT_LENGTH"] = 100 * 1024 * 1024  # 100 MB per request
 
-logging.getLogger().setLevel(logging.WARNING)
+logging.basicConfig(level=logging.INFO, format="%(message)s")
+log = logging.getLogger("invoice_splitter.ui")
+
+
+@app.errorhandler(Exception)
+def handle_unhandled_exception(exc: Exception):
+    log.error("Unhandled server error:\n%s", traceback.format_exc())
+    return jsonify({"error": f"Server error: {exc}"}), 500
 
 
 def _folder_payload() -> Dict[str, str]:
@@ -89,8 +97,21 @@ def api_open_folder():
     return jsonify({"opened": str(path)})
 
 
+@app.get("/api/health")
+def api_health():
+    return jsonify({"ok": True})
+
+
 @app.post("/api/process")
 def api_process():
+    try:
+        return _api_process_impl()
+    except Exception as exc:
+        log.error("api/process failed:\n%s", traceback.format_exc())
+        return jsonify({"error": f"Processing failed: {exc}"}), 500
+
+
+def _api_process_impl():
     setup = get_setup_status()
     if not setup["ready"]:
         return (
@@ -115,6 +136,7 @@ def api_process():
     default_day_output_dir().mkdir(parents=True, exist_ok=True)
     default_day_discard_dir().mkdir(parents=True, exist_ok=True)
 
+    log.info("Processing %s file(s)...", len(uploaded))
     splitter = InvoiceSplitter()
     results: List[Dict[str, Any]] = []
 
@@ -141,13 +163,15 @@ def api_process():
             dest = input_dir / f"{dest.stem}_{datetime.now().strftime('%H%M%S')}{dest.suffix}"
 
         storage.save(dest)
+        log.info("Splitting: %s", dest.name)
 
         try:
-            logging.getLogger("invoice_splitter").setLevel(logging.WARNING)
+            logging.getLogger("invoice_splitter").setLevel(logging.INFO)
             run = splitter.split_pdf(str(dest), print_summary=False)
             # split_pdf prints summary; avoid double noise in server console
             results.append(_result_to_dict(run, dest.name))
         except Exception as e:
+            log.error("Failed on %s: %s", dest.name, e)
             results.append(
                 {
                     "filename": dest.name,

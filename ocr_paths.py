@@ -85,3 +85,20 @@ def find_pdftoppm() -> Optional[str]:
 def find_tesseract() -> Optional[str]:
     configure_ocr_path()
     return shutil.which("tesseract")
+
+
+def poppler_bin_dir() -> Optional[str]:
+    """Directory passed to pdf2image.convert_from_path(poppler_path=...)."""
+    exe = find_pdftoppm()
+    if exe:
+        return str(Path(exe).parent)
+    env_bin = os.environ.get("POPPLER_BIN", "").strip()
+    if env_bin:
+        p = Path(env_bin)
+        return str(p if p.is_dir() else p.parent)
+    return None
+
+
+def tesseract_cmd() -> Optional[str]:
+    """Full path to tesseract.exe for pytesseract."""
+    return find_tesseract()

@@ -47,7 +47,26 @@ def main() -> None:
     print("=" * 50)
     print()
 
-    app.run(host=DEFAULT_HOST, port=args.port, debug=False, use_reloader=False)
+    try:
+        from waitress import serve
+
+        print("  Server: Waitress (stable for long PDF jobs on Windows)")
+        serve(
+            app,
+            host=DEFAULT_HOST,
+            port=args.port,
+            threads=4,
+            channel_timeout=3600,
+        )
+    except ImportError:
+        print("  Server: Flask dev (install waitress for better stability on Windows)")
+        app.run(
+            host=DEFAULT_HOST,
+            port=args.port,
+            debug=False,
+            use_reloader=False,
+            threaded=True,
+        )
 
 
 if __name__ == "__main__":
